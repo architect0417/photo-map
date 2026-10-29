@@ -48,8 +48,73 @@ function openViewer(p) {
 }
 $("viewerClose").addEventListener("click", () => ($("viewer").hidden = true));
 
+// ---- ルート再生 ----
+// 印がルートを進み、写真の場所に着くたびにその写真を約2秒出す
+let playing = null;
+let playGroup = null;
+const MOVE_MS = 1200, SHOW_MS = 2000;
+
+function stopPlay() {
+  if (playing) playing.stopped = true;
+  playing = null;
+  $("play").textContent = "▶再生";
+  $("playCard").hidden = true;
+  view.clearMover();
+}
+
+function showPlayButton(group) {
+  stopPlay();
+  playGroup = group && group.photos.length > 1 ? group : null;
+  $("play").hidden = !playGroup;
+}
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function moveAlong(a, b, run) {
+  return new Promise((done) => {
+    const t0 = performance.now();
+    const step = (now) => {
+      if (run.stopped) return done();
+      const t = Math.min(1, (now - t0) / MOVE_MS);
+      view.setMover(lerpPoint(a, b, t));
+      if (t < 1) requestAnimationFrame(step);
+      else done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function play(group) {
+  stopPlay();
+  const run = { stopped: false };
+  playing = run;
+  $("play").textContent = "■停止";
+  const list = group.photos;
+  for (const [i, p] of list.entries()) {
+    const here = [p.lat, p.lon];
+    if (i === 0) view.setMover(here);
+    else {
+      $("playCard").hidden = true;
+      await moveAlong([list[i - 1].lat, list[i - 1].lon], here, run);
+    }
+    if (run.stopped) return;
+    $("playImg").src = blobUrl(p, "medium");
+    $("playTime").textContent = `${fmtDateTime(p.takenAt)}（${i + 1}/${list.length}）`;
+    $("playCard").hidden = false;
+    await wait(SHOW_MS);
+    if (run.stopped) return;
+  }
+  stopPlay();
+}
+
+$("play").addEventListener("click", () => {
+  if (playing) stopPlay();
+  else if (playGroup) play(playGroup);
+});
+
 // ---- 下の欄：日付一覧 ----
 function showAll() {
+  showPlayButton(null);
   view.refresh();
   view.showPhotos(photos, thumbUrl, openViewer);
   view.showRoute([]);
@@ -58,6 +123,7 @@ function showAll() {
 
 function selectDay(group, card) {
   for (const c of document.querySelectorAll(".day")) c.classList.toggle("active", c === card);
+  showPlayButton(group);
   view.refresh();
   view.showPhotos(group.photos, thumbUrl, openViewer);
   const route = routeOf(group.photos);
@@ -66,6 +132,7 @@ function selectDay(group, card) {
 }
 
 function renderDays() {
+  showPlayButton(null);
   $("results").hidden = true;
   const list = $("days");
   list.hidden = false;
@@ -127,6 +194,7 @@ $("search").addEventListener("submit", async (e) => {
   try {
     const place = await searchPlace(q);
     if (!place) return toast("見つかりませんでした。別の言い方で試してください");
+    showPlayButton(null);
     view.showPhotos(photos, thumbUrl, openViewer);
     view.showRoute([]);
     renderResults(place);

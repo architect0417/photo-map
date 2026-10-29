@@ -18,7 +18,14 @@
     <input id="pick" type="file" accept="image/*" multiple>
   </header>
 
-  <main id="map"></main>
+  <div class="map-wrap">
+    <main id="map"></main>
+    <div id="playCard" hidden>
+      <img id="playImg" alt="">
+      <p id="playTime"></p>
+    </div>
+    <button id="play" type="button" hidden>▶再生</button>
+  </div>
 
   <footer>
     <div id="days" class="days"></div>

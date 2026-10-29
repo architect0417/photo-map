@@ -38,10 +38,29 @@ header {
 #pick { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
 /* 中央：地図 */
-#map { flex: 1; min-height: 0; }
+.map-wrap { flex: 1; min-height: 0; position: relative; display: flex; }
+#map { flex: 1; min-width: 0; }
 .pin img {
   width: 44px; height: 44px; object-fit: cover; display: block;
   border: 2px solid #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+
+/* ルート再生 */
+#play {
+  position: absolute; z-index: 1000; right: 12px; bottom: 32px;
+  padding: 10px 16px; border: 0; border-radius: 22px; font-weight: 700;
+  background: var(--accent); color: var(--on-accent); box-shadow: 0 1px 6px rgba(0, 0, 0, .35); cursor: pointer;
+}
+#play[hidden], #playCard[hidden] { display: none; }
+#playCard {
+  position: absolute; z-index: 1000; top: 10px; left: 50%; transform: translateX(-50%);
+  max-width: calc(100% - 24px); padding: 6px; border-radius: 10px;
+  background: var(--surface); box-shadow: 0 2px 10px rgba(0, 0, 0, .4); pointer-events: none;
+}
+#playImg { display: block; max-width: 100%; max-height: 40vh; border-radius: 6px; }
+#playTime { margin: 4px 0 0; text-align: center; font-size: 14px; font-variant-numeric: tabular-nums; }
+.mover {
+  border: 3px solid #fff; border-radius: 50%; background: #e4572e; box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
 }
 
 /* 下：日付一覧と検索結果 */

@@ -12,6 +12,7 @@ export function createMap(el) {
 
   const pins = L.layerGroup().addTo(map);
   let route = null;
+  let mover = null;
 
   return {
     showPhotos(photos, thumbUrl, onTap) {
@@ -29,6 +30,16 @@ export function createMap(el) {
     showRoute(latlngs) {
       if (route) route.remove();
       route = latlngs.length ? L.polyline(latlngs, { color: "#0f7c6e", weight: 4, opacity: 0.85 }).addTo(map) : null;
+    },
+    // 再生中に動く印（写真のピンより手前に出す）
+    setMover(latlng) {
+      if (mover) return mover.setLatLng(latlng);
+      const icon = L.divIcon({ className: "mover", iconSize: [18, 18], iconAnchor: [9, 9] });
+      mover = L.marker(latlng, { icon, zIndexOffset: 1000, interactive: false }).addTo(map);
+    },
+    clearMover() {
+      if (mover) mover.remove();
+      mover = null;
     },
     refresh() {
       map.invalidateSize({ pan: false });
