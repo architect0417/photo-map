@@ -41,12 +41,35 @@ function toast(msg) {
 }
 
 // ---- 写真を大きく表示 ----
+let viewing = null;
 function openViewer(p) {
+  viewing = p;
   $("viewerImg").src = blobUrl(p, "medium");
   $("viewerTime").textContent = fmtDateTime(p.takenAt);
   $("viewer").hidden = false;
 }
 $("viewerClose").addEventListener("click", () => ($("viewer").hidden = true));
+
+// 写真アプリへ保存：iPhone では共有メニューを開き、そこで「画像を保存」を押してもらう
+// アプリには縮小した写真しか無いので、保存されるのは縮小版（位置情報なし）
+$("viewerSave").addEventListener("click", async () => {
+  if (!viewing) return;
+  const name = viewing.name.replace(/\.[^.]+$/, "") + ".jpg";
+  const file = new File([viewing.medium], name, { type: "image/jpeg" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (err.name !== "AbortError") toast("保存のメニューを開けませんでした");
+    }
+    return;
+  }
+  // 共有メニューが使えないブラウザでは、ファイルとしてダウンロードする
+  const a = document.createElement("a");
+  a.href = blobUrl(viewing, "medium");
+  a.download = name;
+  a.click();
+});
 
 // ---- ルート再生 ----
 // 印がルートを進み、写真の場所に着くたびにその写真を約2秒出す

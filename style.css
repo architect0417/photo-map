@@ -129,6 +129,11 @@ footer {
 #viewer[hidden] { display: none; }
 #viewerImg { max-width: 100%; max-height: 75vh; border-radius: 6px; }
 #viewerTime { margin: 0; color: #fff; font-size: 18px; font-variant-numeric: tabular-nums; }
+#viewerSave {
+  padding: 10px 18px; border: 0; border-radius: 22px; font-weight: 700;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.viewer-note { margin: 0; color: rgba(255, 255, 255, .7); font-size: 12px; text-align: center; }
 #viewerClose {
   position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 12px;
   width: 44px; height: 44px; border-radius: 22px; border: 0; background: rgba(255, 255, 255, .2); color: #fff; font-size: 24px;
@@ -136,7 +141,7 @@ footer {
 
 /* お知らせ */
 #toast {
-  position: fixed; left: 50%; transform: translateX(-50%); z-index: 1500;
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 2500;
   top: calc(env(safe-area-inset-top, 0px) + 64px); max-width: calc(100% - 32px);
   background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 14px;
 }
