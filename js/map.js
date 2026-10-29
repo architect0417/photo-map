@@ -7,6 +7,9 @@ export function createMap(el) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
+  // 下の欄の高さが変わったら、地図の大きさを測り直す
+  new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(el);
+
   const pins = L.layerGroup().addTo(map);
   let route = null;
 
@@ -26,6 +29,9 @@ export function createMap(el) {
     showRoute(latlngs) {
       if (route) route.remove();
       route = latlngs.length ? L.polyline(latlngs, { color: "#0f7c6e", weight: 4, opacity: 0.85 }).addTo(map) : null;
+    },
+    refresh() {
+      map.invalidateSize({ pan: false });
     },
     fitTo(latlngs) {
       if (latlngs.length === 1) map.setView(latlngs[0], 15, { animate: false });

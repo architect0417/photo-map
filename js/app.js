@@ -1,8 +1,8 @@
 // 画面の操作と各部品のつなぎ込み
 
-import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds } from "./photos.js";
+import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk } from "./photos.js";
 import { searchPlace } from "./geocode.js";
-import { resize } from "./images.js";
+import { resizeAll } from "./images.js";
 import { getAllPhotos, putPhotos } from "./store.js";
 import { createMap } from "./map.js";
 
@@ -48,6 +48,7 @@ $("viewerClose").addEventListener("click", () => ($("viewer").hidden = true));
 
 // ---- 下の欄：日付一覧 ----
 function showAll() {
+  view.refresh();
   view.showPhotos(photos, thumbUrl, openViewer);
   view.showRoute([]);
   view.fitTo(photos.map((p) => [p.lat, p.lon]));
@@ -55,6 +56,7 @@ function showAll() {
 
 function selectDay(group, card) {
   for (const c of document.querySelectorAll(".day")) c.classList.toggle("active", c === card);
+  view.refresh();
   view.showPhotos(group.photos, thumbUrl, openViewer);
   const route = routeOf(group.photos);
   view.showRoute(route);
@@ -88,10 +90,14 @@ function renderDays() {
 }
 
 // ---- 下の欄：検索結果（地図の範囲内の写真） ----
-function renderResults(placeName) {
+// 先に欄を出して地図の大きさを確定させてから、範囲を合わせて写真を探す
+function renderResults(place) {
   $("days").hidden = true;
-  const box = $("results");
-  box.hidden = false;
+  $("results").hidden = false;
+  $("resultsList").innerHTML = "";
+  view.refresh();
+  view.fitBounds(place.bounds);
+  const placeName = place.name;
   const found = inBounds(photos, view.getBounds());
   $("resultsTitle").textContent = `${placeName.split(",")[0]} 周辺：${found.length}枚`;
   const ul = $("resultsList");
@@ -117,21 +123,34 @@ $("search").addEventListener("submit", async (e) => {
   try {
     const place = await searchPlace(q);
     if (!place) return toast("見つかりませんでした。別の言い方で試してください");
-    view.fitBounds(place.bounds);
     view.showPhotos(photos, thumbUrl, openViewer);
     view.showRoute([]);
-    renderResults(place.name);
+    renderResults(place);
   } catch (err) {
     toast(err.message);
   }
 });
 
 // ---- 写真の追加 ----
+// 処理中に2回目の追加をさせない（重複判定が前回分を知らないため）
+function setBusy(busy) {
+  $("pick").disabled = busy;
+  document.querySelector(".add").classList.toggle("busy", busy);
+}
+
 $("pick").addEventListener("change", async (e) => {
   const files = [...e.target.files];
   e.target.value = "";
   if (files.length === 0) return;
+  setBusy(true);
+  try {
+    await addFiles(files);
+  } finally {
+    setBusy(false);
+  }
+});
 
+async function addFiles(files) {
   const metas = [];
   const fileOf = new Map();
   let noGps = 0;
@@ -149,27 +168,40 @@ $("pick").addEventListener("change", async (e) => {
     fileOf.set(meta, file);
   }
 
+  // 10枚ずつ保存し、途中で失敗してもそれまでの分は残す
   const fresh = uniqueNew(metas, new Set(photos.map((p) => p.id)));
-  const added = [];
-  try {
-    for (const [i, m] of fresh.entries()) {
-      toast(`画像を準備中 ${i + 1}/${fresh.length}`);
-      const file = fileOf.get(m);
-      added.push({ id: makeId(m), ...m, thumb: await resize(file, 160), medium: await resize(file, 1200) });
+  let done = 0, broken = 0, countAdded = 0, stopReason = null;
+  for (const group of chunk(fresh, 10)) {
+    const batch = [];
+    for (const m of group) {
+      toast(`画像を準備中 ${++done}/${fresh.length}`);
+      try {
+        const [thumb, medium] = await resizeAll(fileOf.get(m), [160, 1200]);
+        batch.push({ id: makeId(m), ...m, thumb, medium });
+      } catch {
+        broken++;
+      }
     }
-    await putPhotos(added);
-  } catch (err) {
-    return toast(err.message || "写真を追加できませんでした");
+    try {
+      await putPhotos(batch);
+      photos = photos.concat(batch);
+      countAdded += batch.length;
+    } catch (err) {
+      stopReason = (err && err.message) || "写真を保存できませんでした";
+      break;
+    }
   }
 
-  photos = photos.concat(added);
   renderDays();
   showAll();
-  const msgs = [`${added.length}枚追加しました`];
+  const msgs = [];
+  if (stopReason) msgs.push(stopReason);
+  msgs.push(`${countAdded}枚追加しました`);
   if (metas.length > fresh.length) msgs.push(`${metas.length - fresh.length}枚は追加済みでした`);
   if (noGps) msgs.push(`${noGps}枚は位置情報がないため追加できませんでした`);
+  if (broken) msgs.push(`${broken}枚は画像を読み込めませんでした`);
   toast(msgs.join("／"));
-});
+}
 
 // ---- 起動 ----
 (async () => {

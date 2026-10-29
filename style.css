@@ -34,6 +34,7 @@ header {
   flex: none; padding: 10px 14px; border-radius: 10px; font-weight: 700;
   background: var(--accent); color: var(--on-accent); cursor: pointer;
 }
+.add.busy { opacity: .5; pointer-events: none; }
 #pick { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
 /* 中央：地図 */

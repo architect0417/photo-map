@@ -43,3 +43,15 @@ test("inBounds: 範囲内だけを新しい順で", () => {
   const r = inBounds(ps, { south: 26, west: 127, north: 27, east: 128 });
   assert.deepEqual(r.map(x => x.id), ["in-new", "in-old"]);
 });
+
+import { chunk, storageError } from "../js/photos.js";
+
+test("chunk: 指定の枚数ずつに分ける", () => {
+  assert.deepEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
+  assert.deepEqual(chunk([], 10), []);
+});
+test("storageError: 容量不足は日本語の理由、エラーが無くても必ず Error を返す", () => {
+  assert.equal(storageError({ name: "QuotaExceededError" }).message, "iPhoneの保存容量が足りません。写真を減らして試してください");
+  assert.equal(storageError(null).message, "写真を保存できませんでした");
+  assert.ok(storageError(new Error("x")) instanceof Error);
+});

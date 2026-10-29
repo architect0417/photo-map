@@ -1,5 +1,7 @@
 // 写真データの保存（Safari の中の IndexedDB）
 
+import { storageError } from "./photos.js";
+
 const DB_NAME = "photo-map";
 const STORE = "photos";
 
@@ -28,13 +30,7 @@ export async function putPhotos(photos) {
     const store = tx.objectStore(STORE);
     for (const p of photos) store.put(p);
     tx.oncomplete = () => resolve();
-    const fail = () => {
-      const err = tx.error;
-      reject(err && err.name === "QuotaExceededError"
-        ? new Error("iPhoneの保存容量が足りません。写真を減らして試してください")
-        : err);
-    };
-    tx.onerror = fail;
-    tx.onabort = fail;
+    // onerror の時点では tx.error がまだ空のことがあるので、abort で理由を受け取る
+    tx.onabort = () => reject(storageError(tx.error));
   });
 }

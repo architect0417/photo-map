@@ -54,6 +54,19 @@ export function uniqueNew(metas, existingIds) {
   });
 }
 
+// 少しずつ保存するために n 件ずつに分ける
+export function chunk(list, n) {
+  const out = [];
+  for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+  return out;
+}
+
+// 保存の失敗を、画面に出せる Error に直す
+export function storageError(err) {
+  if (err && err.name === "QuotaExceededError") return new Error("iPhoneの保存容量が足りません。写真を減らして試してください");
+  return err instanceof Error ? err : new Error("写真を保存できませんでした");
+}
+
 // 地図の範囲内の写真を新しい順で
 export function inBounds(photos, b) {
   return photos
