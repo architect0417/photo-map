@@ -1,0 +1,92 @@
+:root {
+  --bg: #f3f6f5; --surface: #ffffff; --fg: #1d2a28; --muted: #5d6e6b;
+  --line: #d5dfdc; --accent: #0f7c6e; --on-accent: #ffffff;
+  --font: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121a19; --surface: #1b2624; --fg: #e4ecea; --muted: #9aaeaa;
+    --line: #2e3d3a; --accent: #4cc2b0; --on-accent: #0b1513; color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 16px;
+  padding-top: env(safe-area-inset-top, 0px);
+}
+button { font: inherit; color: inherit; }
+
+/* 上：検索と写真追加 */
+header {
+  display: flex; gap: 8px; align-items: center;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+#search { flex: 1; min-width: 0; }
+#q {
+  width: 100%; font-size: 16px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--fg);
+}
+.add {
+  flex: none; padding: 10px 14px; border-radius: 10px; font-weight: 700;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+#pick { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+/* 中央：地図 */
+#map { flex: 1; min-height: 0; }
+.pin img {
+  width: 44px; height: 44px; object-fit: cover; display: block;
+  border: 2px solid #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+}
+
+/* 下：日付一覧と検索結果 */
+footer {
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.days {
+  display: flex; gap: 8px; overflow-x: auto; padding: 10px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.day {
+  flex: none; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); cursor: pointer;
+}
+.day img { width: 60px; height: 44px; object-fit: cover; border-radius: 6px; }
+.day span { font-size: 12px; color: var(--muted); }
+.day.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.empty { margin: 0; padding: 8px 4px; color: var(--muted); font-size: 14px; }
+
+#results { padding: 8px 12px 10px; }
+.results-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+.results-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#backToDays { flex: none; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+#resultsList { list-style: none; margin: 0; padding: 0; max-height: 30vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+#resultsList button { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+#resultsList img { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; }
+
+/* 写真の拡大表示 */
+#viewer {
+  position: fixed; inset: 0; z-index: 2000; background: rgba(0, 0, 0, .9);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+}
+#viewer[hidden] { display: none; }
+#viewerImg { max-width: 100%; max-height: 75vh; border-radius: 6px; }
+#viewerTime { margin: 0; color: #fff; font-size: 18px; font-variant-numeric: tabular-nums; }
+#viewerClose {
+  position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: 12px;
+  width: 44px; height: 44px; border-radius: 22px; border: 0; background: rgba(255, 255, 255, .2); color: #fff; font-size: 24px;
+}
+
+/* お知らせ */
+#toast {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 1500;
+  top: calc(env(safe-area-inset-top, 0px) + 64px); max-width: calc(100% - 32px);
+  background: var(--fg); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 14px;
+}
+#toast[hidden] { display: none; }
