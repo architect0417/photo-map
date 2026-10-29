@@ -1,6 +1,6 @@
 // 画面の操作と各部品のつなぎ込み
 
-import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk, daySummary, lerpPoint, placeKey, placesOf, lastBatch } from "./photos.js";
+import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk, daySummary, lerpPoint, placeKey, placesOf, lastBatch, mainArea, wareki } from "./photos.js";
 import { searchPlace, reversePlace } from "./geocode.js";
 import { resizeAll } from "./images.js";
 import { getAllPhotos, putPhotos, deletePhotos } from "./store.js";
@@ -22,13 +22,13 @@ const thumbUrl = (p) => blobUrl(p, "thumb");
 const pad = (n) => String(n).padStart(2, "0");
 function fmtDateTime(t) {
   const d = new Date(t);
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${wareki(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 const fmtTime = (t) => { const d = new Date(t); return `${d.getHours()}:${pad(d.getMinutes())}`; };
 const fmtKm = (km) => (km < 10 ? km.toFixed(1) : Math.round(km)) + "km";
 function fmtDay(day) {
-  const [, m, d] = day.split("-");
-  return `${Number(m)}/${Number(d)}`;
+  const [y, m, d] = day.split("-").map(Number);
+  return wareki(new Date(y, m - 1, d));
 }
 
 let toastTimer;
@@ -168,44 +168,57 @@ function renderDays() {
   updatePlaceLabels();
 }
 
-// ---- 地名（日付カードの「沖縄県宜野湾市」） ----
+// ---- 地名（日付カードの「沖縄県宜野湾市我如古」） ----
 let dayCards = [];
+
+// 「沖縄県」と「宜野湾市我如古ほか」の2行。2行目は少し小さく、長ければ「…」で切る
+function setPlaceLabel(btn, top, rest) {
+  btn.innerHTML = `<span class="pref"></span><span class="rest"></span>`;
+  btn.firstChild.textContent = top;
+  btn.lastChild.textContent = rest;
+}
 
 function updatePlaceLabels() {
   for (const { group, placeBtn } of dayCards) {
     const places = placesOf(group.photos);
-    const pending = group.photos.some((p) => p.place === undefined);
+    const pending = group.photos.some((p) => p.area === undefined);
     placeBtn.disabled = places.length === 0;
     placeBtn.hidden = places.length === 0 && !pending;
-    if (places.length === 0) placeBtn.textContent = "地名を調べ中…";
-    // 「沖縄県」と「本部町ほか」の2行に分ける
-    else placeBtn.textContent = places[0].place.replace(/^(北海道|.+?[都府県])(?=.)/, "$1\n") +(places.length > 1 ? "ほか" : "");
+    if (places.length === 0) {
+      setPlaceLabel(placeBtn, "地名を", "調べ中…");
+      continue;
+    }
+    const top = places[0].place;
+    const m = /^(北海道|.+?[都府県])(.+)$/.exec(top);
+    const [pref, city] = m ? [m[1], m[2]] : ["", top];
+    setPlaceLabel(placeBtn, pref, city + mainArea(group.photos, top) + (places.length > 1 ? "ほか" : ""));
   }
 }
 
-// 写真の位置から市町村名を調べて、写真と一緒に保存する
+// 写真の位置から市町村名と字名を調べて、写真と一緒に保存する
 // 地名サービスの決まりで1秒に1回まで。同じ場所（約100m四方）は1回だけ調べる
+// 字名が入る前に調べた写真（area が無い）も、もう一度調べる
 const placeCache = new Map();
 let filling = false;
 async function fillPlaces() {
   if (filling) return;
   filling = true;
   try {
-    for (const p of photos) if (p.place !== undefined) placeCache.set(placeKey(p.lat, p.lon), p.place);
+    for (const p of photos) if (p.area !== undefined) placeCache.set(placeKey(p.lat, p.lon), { place: p.place, area: p.area });
     let p;
-    while ((p = photos.find((x) => x.place === undefined))) {
+    while ((p = photos.find((x) => x.area === undefined))) {
       const key = placeKey(p.lat, p.lon);
       if (!placeCache.has(key)) {
         try {
-          placeCache.set(key, (await reversePlace(p.lat, p.lon)) || "");
+          placeCache.set(key, (await reversePlace(p.lat, p.lon)) || { place: "", area: "" });
         } catch {
           break; // 通信できないときは、次に開いたときに続きを調べる
         }
         await wait(1100);
       }
       // 調べている間に「元に戻す」で消された写真は photos に無いので、保存し直さない
-      for (const q of photos.filter((x) => x.place === undefined && placeKey(x.lat, x.lon) === key)) {
-        q.place = placeCache.get(key);
+      for (const q of photos.filter((x) => x.area === undefined && placeKey(x.lat, x.lon) === key)) {
+        Object.assign(q, placeCache.get(key));
         await putPhotos([q]).catch(() => {});
       }
       updatePlaceLabels();
@@ -266,7 +279,8 @@ function fillResults(found) {
   const ul = $("resultsList");
   for (const p of found) {
     const li = document.createElement("li");
-    li.innerHTML = `<button><img src="${thumbUrl(p)}" alt=""><span>${fmtDateTime(p.takenAt)}</span></button>`;
+    li.innerHTML = `<button><img src="${thumbUrl(p)}" alt=""><span></span></button>`;
+    li.querySelector("span").textContent = `${fmtDateTime(p.takenAt)}　${p.area || ""}`;
     li.querySelector("button").addEventListener("click", () => openViewer(p));
     ul.appendChild(li);
   }
@@ -341,7 +355,7 @@ async function addFiles(files) {
     for (const m of group) {
       toast(`画像を準備中 ${++done}/${fresh.length}`);
       try {
-        const [thumb, medium] = await resizeAll(fileOf.get(m), [160, 1200]);
+        const [thumb, medium] = await resizeAll(fileOf.get(m), [320, 1200]);
         batch.push({ id: makeId(m), ...m, thumb, medium, batch: batchId });
       } catch {
         broken++;

@@ -7,6 +7,12 @@ export function createMap(el) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
+  // 拡大するほど写真のピンを大きくする（大きさは CSS の --pin で決める）
+  const pinSize = (z) => (z <= 13 ? 44 : z === 14 ? 56 : z === 15 ? 72 : z === 16 ? 96 : 128);
+  const setPinSize = () => el.style.setProperty("--pin", `${pinSize(map.getZoom())}px`);
+  map.on("zoomend", setPinSize);
+  setPinSize();
+
   // 下の欄の高さが変わったら、地図の大きさを測り直す
   new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(el);
 
@@ -18,11 +24,11 @@ export function createMap(el) {
     showPhotos(photos, thumbUrl, onTap) {
       pins.clearLayers();
       for (const p of photos) {
+        // 大きさ0の点を撮影地点に置き、写真はその上に三角の先で指すように出す
         const icon = L.divIcon({
           className: "pin",
           html: `<img src="${thumbUrl(p)}" alt="">`,
-          iconSize: [44, 44],
-          iconAnchor: [22, 22],
+          iconSize: null,
         });
         L.marker([p.lat, p.lon], { icon }).on("click", () => onTap(p)).addTo(pins);
       }

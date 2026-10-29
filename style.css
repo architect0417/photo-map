@@ -46,9 +46,17 @@ header {
 /* 中央：地図 */
 .map-wrap { flex: 1; min-height: 0; position: relative; display: flex; }
 #map { flex: 1; min-width: 0; }
-.pin img {
-  width: 44px; height: 44px; object-fit: cover; display: block;
+#map { --pin: 44px; }
+.pin { width: 0; height: 0; }
+#map .pin img {
+  position: absolute; left: calc(var(--pin) / -2); bottom: 7px;
+  width: var(--pin); height: var(--pin); object-fit: cover; display: block;
   border: 2px solid #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+  transition: width .2s, height .2s, left .2s;
+}
+.pin::after {
+  content: ""; position: absolute; left: -6px; bottom: 0;
+  border-style: solid; border-width: 8px 6px 0; border-color: #fff transparent transparent;
 }
 
 /* ルート再生 */
@@ -90,8 +98,10 @@ footer {
 }
 .day-place {
   margin-top: 4px; padding: 4px 2px; border: 0; border-top: 1px solid var(--line); background: none;
-  font-size: 11px; line-height: 1.3; color: var(--accent); text-decoration: underline; cursor: pointer; white-space: pre-line;
+  font-size: 11px; line-height: 1.3; color: var(--accent); text-decoration: underline; cursor: pointer;
 }
+.day-place span { display: block; }
+.day-place .rest { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .day-place:disabled { color: var(--muted); text-decoration: none; cursor: default; }
 .day-place[hidden] { display: none; }
 .day img { width: 60px; height: 44px; object-fit: cover; border-radius: 6px; }

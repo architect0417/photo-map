@@ -120,3 +120,20 @@ export function lastBatch(photos) {
   const latest = Math.max(...photos.map((p) => p.batch || 0));
   return photos.filter((p) => (p.batch || 0) === latest);
 }
+
+// その市町村で撮った写真の中で、一番多い字名
+export function mainArea(photos, place) {
+  const top = placesOf(photos.filter((p) => p.place === place).map((p) => ({ place: p.area })));
+  return top.length ? top[0].place : "";
+}
+
+// 和暦の短い形（例：R8.10.29）
+const ERAS = [
+  ["R", new Date(2019, 4, 1), 2018],
+  ["H", new Date(1989, 0, 8), 1988],
+  ["S", new Date(1926, 11, 25), 1925],
+];
+export function wareki(date) {
+  const [mark, , offset] = ERAS.find(([, start]) => date >= start) || ERAS[ERAS.length - 1];
+  return `${mark}${date.getFullYear() - offset}.${date.getMonth() + 1}.${date.getDate()}`;
+}

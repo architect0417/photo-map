@@ -95,3 +95,18 @@ test("lastBatch: 一番最近の追加分。batch の無い古い写真はまと
   assert.deepEqual(lastBatch(ps.filter((p) => p.batch !== 200 && p.batch !== 100)).map((p) => p.id), ["old1", "old2"]);
   assert.deepEqual(lastBatch([]), []);
 });
+
+import { mainArea, wareki } from "../js/photos.js";
+
+test("mainArea: その市町村の中で一番多い字名", () => {
+  const ps = [{ place: "沖縄県宜野湾市", area: "我如古" }, { place: "沖縄県宜野湾市", area: "大山" }, { place: "沖縄県宜野湾市", area: "我如古" }, { place: "沖縄県那覇市", area: "泉崎" }, { place: "沖縄県宜野湾市", area: "" }];
+  assert.equal(mainArea(ps, "沖縄県宜野湾市"), "我如古");
+  assert.equal(mainArea(ps, "沖縄県本部町"), "");
+});
+test("wareki: R8.10.29 の形。令和・平成の切り替わり", () => {
+  assert.equal(wareki(new Date(2026, 9, 29)), "R8.10.29");
+  assert.equal(wareki(new Date(2019, 4, 1)), "R1.5.1");
+  assert.equal(wareki(new Date(2019, 3, 30)), "H31.4.30");
+  assert.equal(wareki(new Date(1989, 0, 8)), "H1.1.8");
+  assert.equal(wareki(new Date(1989, 0, 7)), "S64.1.7");
+});

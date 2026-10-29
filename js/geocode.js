@@ -29,19 +29,22 @@ const PREFS = [
   "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ];
 
-// 逆ジオコーディングの結果から「沖縄県宜野湾市」の形にする。地名が無ければ null
+// 逆ジオコーディングの結果から { place: "沖縄県宜野湾市", area: "我如古" } の形にする。地名が無ければ null
+// 字名は quarter。無ければ neighbourhood から「〇丁目」を除いたもの
 export function parsePlace(json) {
   const a = json && json.address;
   if (!a) return null;
   const m = /^JP-(\d\d)$/.exec(a["ISO3166-2-lvl4"] || "");
   const pref = (m && PREFS[Number(m[1]) - 1]) || a.province || a.state || "";
   const city = a.city || a.town || a.village || a.county || "";
-  return pref + city || null;
+  if (!(pref + city)) return null;
+  const area = a.quarter || (a.neighbourhood || "").replace(/[一二三四五六七八九十]+丁目$/, "");
+  return { place: pref + city, area };
 }
 
-// 位置（緯度・経度）だけを送って、市町村名を調べる
+// 位置（緯度・経度）だけを送って、市町村名と字名を調べる
 export async function reversePlace(lat, lon) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=ja&lat=${lat}&lon=${lon}`;
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&accept-language=ja&lat=${lat}&lon=${lon}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error("地名を調べられませんでした");
   return parsePlace(await res.json());
