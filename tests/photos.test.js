@@ -55,3 +55,24 @@ test("storageError: 容量不足は日本語の理由、エラーが無くても
   assert.equal(storageError(null).message, "写真を保存できませんでした");
   assert.ok(storageError(new Error("x")) instanceof Error);
 });
+
+import { distanceKm, daySummary, lerpPoint } from "../js/photos.js";
+
+test("distanceKm: 点と点をまっすぐ結んだ長さの合計", () => {
+  assert.ok(Math.abs(distanceKm([[26, 127], [27, 127]]) - 111.19) < 0.01);
+  assert.ok(Math.abs(distanceKm([[26, 127], [27, 127], [26, 127]]) - 222.39) < 0.01);
+  assert.equal(distanceKm([]), 0);
+  assert.equal(distanceKm([[26, 127]]), 0);
+});
+test("daySummary: 距離と最初・最後の撮影時刻", () => {
+  const s = daySummary([{ takenAt: at(17, 40), lat: 27, lon: 127 }, { takenAt: at(9, 5), lat: 26, lon: 127 }]);
+  assert.equal(s.start, at(9, 5));
+  assert.equal(s.end, at(17, 40));
+  assert.ok(Math.abs(s.km - 111.19) < 0.01);
+  assert.deepEqual(daySummary([{ takenAt: at(9), lat: 26, lon: 127 }]), { km: 0, start: at(9), end: at(9) });
+});
+test("lerpPoint: 2点の間を t の割合で進んだ位置", () => {
+  assert.deepEqual(lerpPoint([0, 0], [10, 20], 0), [0, 0]);
+  assert.deepEqual(lerpPoint([0, 0], [10, 20], 0.5), [5, 10]);
+  assert.deepEqual(lerpPoint([0, 0], [10, 20], 1), [10, 20]);
+});

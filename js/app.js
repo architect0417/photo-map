@@ -1,6 +1,6 @@
 // 画面の操作と各部品のつなぎ込み
 
-import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk } from "./photos.js";
+import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk, daySummary, lerpPoint } from "./photos.js";
 import { searchPlace } from "./geocode.js";
 import { resizeAll } from "./images.js";
 import { getAllPhotos, putPhotos } from "./store.js";
@@ -24,6 +24,8 @@ function fmtDateTime(t) {
   const d = new Date(t);
   return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+const fmtTime = (t) => { const d = new Date(t); return `${d.getHours()}:${pad(d.getMinutes())}`; };
+const fmtKm = (km) => (km < 10 ? km.toFixed(1) : Math.round(km)) + "km";
 function fmtDay(day) {
   const [, m, d] = day.split("-");
   return `${Number(m)}/${Number(d)}`;
@@ -83,7 +85,9 @@ function renderDays() {
   for (const g of groupByDay(photos)) {
     const card = document.createElement("button");
     card.className = "day";
-    card.innerHTML = `<img src="${thumbUrl(g.photos[0])}" alt=""><b>${fmtDay(g.day)}</b><span>${g.photos.length}枚</span>`;
+    const s = daySummary(g.photos);
+    const span = s.start === s.end ? fmtTime(s.start) : `${fmtTime(s.start)}〜${fmtTime(s.end)}`;
+    card.innerHTML = `<img src="${thumbUrl(g.photos[0])}" alt=""><b>${fmtDay(g.day)}</b><span>${g.photos.length}枚${g.photos.length > 1 ? "・" + fmtKm(s.km) : ""}</span><span>${span}</span>`;
     card.addEventListener("click", () => selectDay(g, card));
     list.appendChild(card);
   }

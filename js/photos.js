@@ -73,3 +73,31 @@ export function inBounds(photos, b) {
     .filter((p) => p.lat >= b.south && p.lat <= b.north && p.lon >= b.west && p.lon <= b.east)
     .sort((a, b) => b.takenAt - a.takenAt);
 }
+
+// [lat, lon] の並びを、点と点をまっすぐ結んだ長さ（km）で合計する
+export function distanceKm(latlngs) {
+  const R = 6371;
+  const rad = (d) => (d * Math.PI) / 180;
+  let km = 0;
+  for (let i = 1; i < latlngs.length; i++) {
+    const [lat1, lon1] = latlngs[i - 1], [lat2, lon2] = latlngs[i];
+    const a = Math.sin(rad(lat2 - lat1) / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(rad(lon2 - lon1) / 2) ** 2;
+    km += 2 * R * Math.asin(Math.sqrt(a));
+  }
+  return km;
+}
+
+// 1日分の移動距離と、最初・最後の撮影時刻
+export function daySummary(photos) {
+  const sorted = [...photos].sort(byOldest);
+  return {
+    km: distanceKm(sorted.map((p) => [p.lat, p.lon])),
+    start: sorted[0].takenAt,
+    end: sorted[sorted.length - 1].takenAt,
+  };
+}
+
+// a から b へ t（0〜1）の割合だけ進んだ位置
+export function lerpPoint(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+}
