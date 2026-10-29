@@ -70,6 +70,13 @@ function showPlayButton(group) {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// 大きい写真は読み込みに時間がかかるので、先に読み込んでおく
+function preload(url) {
+  const img = new Image();
+  img.src = url;
+  return img.decode().catch(() => {});
+}
+
 function moveAlong(a, b, run) {
   return new Promise((done) => {
     const t0 = performance.now();
@@ -94,13 +101,18 @@ async function play(group) {
   view.fitTo(routeOf(list), window.innerHeight * 0.5);
   for (const [i, p] of list.entries()) {
     const here = [p.lat, p.lon];
+    const url = blobUrl(p, "medium");
+    const ready = preload(url); // 印が動いている間に読み込む
     if (i === 0) view.setMover(here);
     else {
       $("playCard").hidden = true;
       await moveAlong([list[i - 1].lat, list[i - 1].lon], here, run);
     }
+    await ready;
     if (run.stopped) return;
-    $("playImg").src = blobUrl(p, "medium");
+    $("playImg").src = url;
+    await $("playImg").decode().catch(() => {});
+    if (run.stopped) return;
     $("playTime").textContent = `${fmtDateTime(p.takenAt)}（${i + 1}/${list.length}）`;
     $("playCard").hidden = false;
     await wait(SHOW_MS);
