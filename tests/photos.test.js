@@ -76,3 +76,22 @@ test("lerpPoint: 2点の間を t の割合で進んだ位置", () => {
   assert.deepEqual(lerpPoint([0, 0], [10, 20], 0.5), [5, 10]);
   assert.deepEqual(lerpPoint([0, 0], [10, 20], 1), [10, 20]);
 });
+
+import { placeKey, placesOf, lastBatch } from "../js/photos.js";
+
+test("placeKey: 約100m四方で同じ場所とみなす", () => {
+  assert.equal(placeKey(26.28162, 127.77809), "26.282,127.778");
+  assert.equal(placeKey(26.28171, 127.77812), placeKey(26.28158, 127.77791));
+  assert.notEqual(placeKey(26.2812, 127.778), placeKey(26.2832, 127.778));
+});
+test("placesOf: 地名ごとの枚数を多い順に、地名の無い写真は数えない", () => {
+  const ps = [{ place: "沖縄県本部町" }, { place: "沖縄県名護市" }, { place: "沖縄県本部町" }, { place: "" }, {}];
+  assert.deepEqual(placesOf(ps), [{ place: "沖縄県本部町", count: 2 }, { place: "沖縄県名護市", count: 1 }]);
+  assert.deepEqual(placesOf([{}]), []);
+});
+test("lastBatch: 一番最近の追加分。batch の無い古い写真はまとめて1回分", () => {
+  const ps = [{ id: "old1" }, { id: "a", batch: 100 }, { id: "old2" }, { id: "b", batch: 200 }, { id: "c", batch: 200 }];
+  assert.deepEqual(lastBatch(ps).map((p) => p.id), ["b", "c"]);
+  assert.deepEqual(lastBatch(ps.filter((p) => p.batch !== 200 && p.batch !== 100)).map((p) => p.id), ["old1", "old2"]);
+  assert.deepEqual(lastBatch([]), []);
+});

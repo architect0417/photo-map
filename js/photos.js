@@ -101,3 +101,22 @@ export function daySummary(photos) {
 export function lerpPoint(a, b, t) {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 }
+
+// 地名を調べるときの場所の区切り（小数3桁＝約100m四方）
+export const placeKey = (lat, lon) => `${lat.toFixed(3)},${lon.toFixed(3)}`;
+
+// 地名ごとの枚数を多い順に。地名が未取得・不明の写真は数えない
+export function placesOf(photos) {
+  const counts = new Map();
+  for (const p of photos) if (p.place) counts.set(p.place, (counts.get(p.place) || 0) + 1);
+  return [...counts.entries()]
+    .map(([place, count]) => ({ place, count }))
+    .sort((a, b) => b.count - a.count || (a.place < b.place ? -1 : 1));
+}
+
+// 一番最近に追加した分。batch の無い古い写真は、まとめて1回分として扱う
+export function lastBatch(photos) {
+  if (photos.length === 0) return [];
+  const latest = Math.max(...photos.map((p) => p.batch || 0));
+  return photos.filter((p) => (p.batch || 0) === latest);
+}

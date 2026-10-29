@@ -1,9 +1,9 @@
 // 画面の操作と各部品のつなぎ込み
 
-import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk, daySummary, lerpPoint } from "./photos.js";
-import { searchPlace } from "./geocode.js";
+import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk, daySummary, lerpPoint, placeKey, placesOf, lastBatch } from "./photos.js";
+import { searchPlace, reversePlace } from "./geocode.js";
 import { resizeAll } from "./images.js";
-import { getAllPhotos, putPhotos } from "./store.js";
+import { getAllPhotos, putPhotos, deletePhotos } from "./store.js";
 import { createMap } from "./map.js";
 
 const $ = (id) => document.getElementById(id);
@@ -90,6 +90,8 @@ async function play(group) {
   playing = run;
   $("play").textContent = "■停止";
   const list = group.photos;
+  // 上半分は写真で隠れるので、ルートを下半分に収める
+  view.fitTo(routeOf(list), window.innerHeight * 0.5);
   for (const [i, p] of list.entries()) {
     const here = [p.lat, p.lon];
     if (i === 0) view.setMover(here);
@@ -133,6 +135,7 @@ function selectDay(group, card) {
 
 function renderDays() {
   showPlayButton(null);
+  $("undo").hidden = photos.length === 0;
   $("results").hidden = true;
   const list = $("days");
   list.hidden = false;
@@ -149,30 +152,118 @@ function renderDays() {
     showAll();
   });
   list.appendChild(all);
+  dayCards = [];
   for (const g of groupByDay(photos)) {
-    const card = document.createElement("button");
+    const card = document.createElement("div");
     card.className = "day";
     const s = daySummary(g.photos);
     const span = s.start === s.end ? fmtTime(s.start) : `${fmtTime(s.start)}〜${fmtTime(s.end)}`;
-    card.innerHTML = `<img src="${thumbUrl(g.photos[0])}" alt=""><b>${fmtDay(g.day)}</b><span>${g.photos.length}枚${g.photos.length > 1 ? "・" + fmtKm(s.km) : ""}</span><span>${span}</span>`;
-    card.addEventListener("click", () => selectDay(g, card));
+    card.innerHTML = `<button class="day-pick" type="button"><img src="${thumbUrl(g.photos[0])}" alt=""><b>${fmtDay(g.day)}</b><span>${g.photos.length}枚${g.photos.length > 1 ? "・" + fmtKm(s.km) : ""}</span><span>${span}</span></button><button class="day-place" type="button"></button>`;
+    card.querySelector(".day-pick").addEventListener("click", () => selectDay(g, card));
+    const placeBtn = card.querySelector(".day-place");
+    placeBtn.addEventListener("click", () => openDayPlaces(g));
+    dayCards.push({ group: g, placeBtn });
     list.appendChild(card);
   }
+  updatePlaceLabels();
+}
+
+// ---- 地名（日付カードの「沖縄県宜野湾市」） ----
+let dayCards = [];
+
+function updatePlaceLabels() {
+  for (const { group, placeBtn } of dayCards) {
+    const places = placesOf(group.photos);
+    const pending = group.photos.some((p) => p.place === undefined);
+    placeBtn.disabled = places.length === 0;
+    placeBtn.hidden = places.length === 0 && !pending;
+    if (places.length === 0) placeBtn.textContent = "地名を調べ中…";
+    // 「沖縄県」と「本部町ほか」の2行に分ける
+    else placeBtn.textContent = places[0].place.replace(/^(北海道|.+?[都府県])(?=.)/, "$1\n") +(places.length > 1 ? "ほか" : "");
+  }
+}
+
+// 写真の位置から市町村名を調べて、写真と一緒に保存する
+// 地名サービスの決まりで1秒に1回まで。同じ場所（約100m四方）は1回だけ調べる
+const placeCache = new Map();
+let filling = false;
+async function fillPlaces() {
+  if (filling) return;
+  filling = true;
+  try {
+    for (const p of photos) if (p.place !== undefined) placeCache.set(placeKey(p.lat, p.lon), p.place);
+    let p;
+    while ((p = photos.find((x) => x.place === undefined))) {
+      const key = placeKey(p.lat, p.lon);
+      if (!placeCache.has(key)) {
+        try {
+          placeCache.set(key, (await reversePlace(p.lat, p.lon)) || "");
+        } catch {
+          break; // 通信できないときは、次に開いたときに続きを調べる
+        }
+        await wait(1100);
+      }
+      // 調べている間に「元に戻す」で消された写真は photos に無いので、保存し直さない
+      for (const q of photos.filter((x) => x.place === undefined && placeKey(x.lat, x.lon) === key)) {
+        q.place = placeCache.get(key);
+        await putPhotos([q]).catch(() => {});
+      }
+      updatePlaceLabels();
+    }
+  } finally {
+    filling = false;
+    updatePlaceLabels();
+  }
+}
+
+// その日に行った市町村が1つならすぐ写真を、複数なら選ぶ一覧を出す
+function openDayPlaces(group) {
+  const places = placesOf(group.photos);
+  if (places.length === 1) return showPlace(places[0].place);
+  showPlayButton(null);
+  openResults(`${fmtDay(group.day)} に行った場所`);
+  const ul = $("resultsList");
+  for (const { place, count } of places) {
+    const li = document.createElement("li");
+    li.innerHTML = `<button class="choice" type="button"></button>`;
+    li.firstChild.textContent = `${place}（${count}枚）`;
+    li.firstChild.addEventListener("click", () => showPlace(place));
+    ul.appendChild(li);
+  }
+}
+
+// その市町村で撮った写真（全日付）を地図と一覧に出す
+function showPlace(place) {
+  showPlayButton(null);
+  const found = photos.filter((p) => p.place === place).sort((a, b) => b.takenAt - a.takenAt);
+  openResults(`${place}：${found.length}枚`);
+  view.refresh();
+  view.showPhotos(found, thumbUrl, openViewer);
+  view.showRoute([]);
+  view.fitTo(found.map((p) => [p.lat, p.lon]));
+  fillResults(found);
 }
 
 // ---- 下の欄：検索結果（地図の範囲内の写真） ----
 // 先に欄を出して地図の大きさを確定させてから、範囲を合わせて写真を探す
-function renderResults(place) {
+function openResults(title) {
   $("days").hidden = true;
   $("results").hidden = false;
+  $("resultsTitle").textContent = title;
   $("resultsList").innerHTML = "";
+}
+
+function renderResults(place) {
+  openResults("");
   view.refresh();
   view.fitBounds(place.bounds);
-  const placeName = place.name;
   const found = inBounds(photos, view.getBounds());
-  $("resultsTitle").textContent = `${placeName.split(",")[0]} 周辺：${found.length}枚`;
+  $("resultsTitle").textContent = `${place.name.split(",")[0]} 周辺：${found.length}枚`;
+  fillResults(found);
+}
+
+function fillResults(found) {
   const ul = $("resultsList");
-  ul.innerHTML = "";
   for (const p of found) {
     const li = document.createElement("li");
     li.innerHTML = `<button><img src="${thumbUrl(p)}" alt=""><span>${fmtDateTime(p.takenAt)}</span></button>`;
@@ -207,6 +298,7 @@ $("search").addEventListener("submit", async (e) => {
 // 処理中に2回目の追加をさせない（重複判定が前回分を知らないため）
 function setBusy(busy) {
   $("pick").disabled = busy;
+  $("undo").disabled = busy;
   document.querySelector(".add").classList.toggle("busy", busy);
 }
 
@@ -223,6 +315,7 @@ $("pick").addEventListener("change", async (e) => {
 });
 
 async function addFiles(files) {
+  const batchId = Date.now(); // 「元に戻す」で、この回の追加分をまとめて消すための印
   const metas = [];
   const fileOf = new Map();
   let noGps = 0;
@@ -249,7 +342,7 @@ async function addFiles(files) {
       toast(`画像を準備中 ${++done}/${fresh.length}`);
       try {
         const [thumb, medium] = await resizeAll(fileOf.get(m), [160, 1200]);
-        batch.push({ id: makeId(m), ...m, thumb, medium });
+        batch.push({ id: makeId(m), ...m, thumb, medium, batch: batchId });
       } catch {
         broken++;
       }
@@ -273,7 +366,37 @@ async function addFiles(files) {
   if (noGps) msgs.push(`${noGps}枚は位置情報がないため追加できませんでした`);
   if (broken) msgs.push(`${broken}枚は画像を読み込めませんでした`);
   toast(msgs.join("／"));
+  fillPlaces();
 }
+
+// ---- 元に戻す（一番最近の追加分を消す。押すたびに1回前へ） ----
+$("undo").addEventListener("click", async () => {
+  const target = lastBatch(photos);
+  if (target.length === 0) return;
+  const when = target[0].batch ? `${fmtDateTime(target[0].batch)} に追加した` : "以前に追加した";
+  if (!confirm(`${when}${target.length}枚を取り消しますか？\n（iPhoneの写真アプリの写真は消えません）`)) return;
+  setBusy(true);
+  try {
+    await deletePhotos(target.map((p) => p.id));
+  } catch {
+    toast("取り消せませんでした");
+    return;
+  } finally {
+    setBusy(false);
+  }
+  const gone = new Set(target);
+  photos = photos.filter((p) => !gone.has(p));
+  for (const p of target) {
+    for (const kind of ["thumb", "medium"]) {
+      const key = `${kind}:${p.id}`;
+      if (urlCache.has(key)) URL.revokeObjectURL(urlCache.get(key));
+      urlCache.delete(key);
+    }
+  }
+  renderDays();
+  showAll();
+  toast(`${target.length}枚を取り消しました`);
+});
 
 // ---- 起動 ----
 (async () => {
@@ -284,4 +407,5 @@ async function addFiles(files) {
   }
   renderDays();
   if (photos.length) showAll();
+  fillPlaces();
 })();

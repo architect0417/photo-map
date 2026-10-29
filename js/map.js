@@ -44,9 +44,10 @@ export function createMap(el) {
     refresh() {
       map.invalidateSize({ pan: false });
     },
-    fitTo(latlngs) {
+    // top：上に重なる表示の高さ（その下の部分に収める）
+    fitTo(latlngs, top = 0) {
       if (latlngs.length === 1) map.setView(latlngs[0], 15, { animate: false });
-      else if (latlngs.length > 1) map.fitBounds(latlngs, { padding: [40, 40], animate: false });
+      else if (latlngs.length > 1) map.fitBounds(latlngs, { paddingTopLeft: [40, 40 + top], paddingBottomRight: [40, 40], maxZoom: 17, animate: false });
     },
     fitBounds(b) {
       map.fitBounds([[b.south, b.west], [b.north, b.east]], { animate: false });

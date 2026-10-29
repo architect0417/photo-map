@@ -34,3 +34,14 @@ export async function putPhotos(photos) {
     tx.onabort = () => reject(storageError(tx.error));
   });
 }
+
+export async function deletePhotos(ids) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    for (const id of ids) store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onabort = () => reject(tx.error || new Error("取り消せませんでした"));
+  });
+}
