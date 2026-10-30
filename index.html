@@ -17,7 +17,15 @@
     <button id="undo" type="button" hidden>↩戻す</button>
     <label class="add" for="pick">＋写真</label>
     <input id="pick" type="file" accept="image/*" multiple>
+    <button id="more" type="button" aria-label="その他" aria-expanded="false">⋯</button>
   </header>
+
+  <div id="menu" hidden>
+    <button id="exportBtn" type="button">書き出し（他の機器へ移す）</button>
+    <label id="importLabel" for="importPick">読み込み（他の機器から）</label>
+    <input id="importPick" type="file">
+    <p>書き出したファイルを OneDrive などに保存し、別の機器の「読み込み」で選んでください</p>
+  </div>
 
   <div class="map-wrap">
     <main id="map"></main>

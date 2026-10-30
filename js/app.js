@@ -4,6 +4,7 @@ import { pickMeta, makeId, groupByDay, routeOf, uniqueNew, inBounds, chunk, dayS
 import { searchPlace, reversePlace } from "./geocode.js";
 import { resizeAll } from "./images.js";
 import { getAllPhotos, putPhotos, deletePhotos } from "./store.js";
+import { packBackup, unpackBackup, solid } from "./backup.js";
 import { createMap } from "./map.js";
 
 const $ = (id) => document.getElementById(id);
@@ -348,6 +349,7 @@ $("search").addEventListener("submit", async (e) => {
 function setBusy(busy) {
   $("pick").disabled = busy;
   $("undo").disabled = busy;
+  $("more").disabled = busy;
   document.querySelector(".add").classList.toggle("busy", busy);
 }
 
@@ -446,6 +448,83 @@ $("undo").addEventListener("click", async () => {
   showAll();
   toast(`${target.length}枚を取り消しました`);
 });
+
+// ---- 他の機器へ移す（書き出し・読み込み） ----
+function showMenu(open) {
+  $("menu").hidden = !open;
+  $("more").setAttribute("aria-expanded", String(open));
+}
+$("more").addEventListener("click", () => showMenu($("menu").hidden));
+document.addEventListener("click", (e) => {
+  if (!$("menu").hidden && !e.target.closest("#menu, #more")) showMenu(false);
+});
+
+// iPhone では共有メニューを開き「ファイルに保存」で OneDrive などへ。PC ではダウンロード
+$("exportBtn").addEventListener("click", async () => {
+  showMenu(false);
+  if (photos.length === 0) return toast("書き出す写真がありません");
+  const d = new Date();
+  const name = `photo-map_${wareki(d)}_${pad(d.getHours())}${pad(d.getMinutes())}.pmap`;
+  const file = new File([packBackup(photos)], name, { type: "application/octet-stream" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (err.name !== "AbortError") toast("書き出しのメニューを開けませんでした");
+    }
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast(`${photos.length}枚を書き出しました（ダウンロードフォルダ）`);
+});
+
+$("importPick").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  showMenu(false);
+  if (!file) return;
+  setBusy(true);
+  try {
+    await importFile(file);
+  } finally {
+    setBusy(false);
+  }
+});
+
+// すでにある写真は飛ばし、新しい写真だけ追加する。地名もそのまま引き継ぐ
+async function importFile(file) {
+  const list = await unpackBackup(file).catch(() => null);
+  if (!list) return toast("このアプリで書き出したファイルではありません");
+  const batchId = Date.now(); // 「元に戻す」で読み込んだ分をまとめて消せるように
+  const fresh = list.filter((p) => !photos.some((q) => q.id === p.id));
+  let countAdded = 0, stopReason = null;
+  for (const group of chunk(fresh, 10)) {
+    try {
+      const batch = [];
+      for (const p of group) batch.push({ ...p, thumb: await solid(p.thumb), medium: await solid(p.medium), batch: batchId });
+      await putPhotos(batch);
+      photos = photos.concat(batch);
+      countAdded += batch.length;
+      toast(`読み込み中 ${countAdded}/${fresh.length}`);
+    } catch (err) {
+      stopReason = (err && err.message) || "写真を保存できませんでした";
+      break;
+    }
+  }
+  renderDays();
+  showAll();
+  const msgs = [];
+  if (stopReason) msgs.push(stopReason);
+  msgs.push(`${countAdded}枚読み込みました`);
+  if (list.length > fresh.length) msgs.push(`${list.length - fresh.length}枚は追加済みでした`);
+  toast(msgs.join("／"));
+  fillPlaces();
+}
 
 // ---- 起動 ----
 (async () => {
